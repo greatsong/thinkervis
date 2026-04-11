@@ -6,7 +6,11 @@
     "dev": "vite",
     "server": "node server/index.js",
     "start": "concurrently \"npm run server\" \"npm run dev\"",
-    "build": "vite build"
+    "build": "vite build",
+    "checkpoint": "node server/index.js --checkpoint",
+    "sync": "node server/sync.js both",
+    "sync:upload": "node server/sync.js upload",
+    "sync:download": "node server/sync.js download"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
