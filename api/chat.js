@@ -1,5 +1,3 @@
-import Anthropic from '@anthropic-ai/sdk';
-
 export const config = {
   maxDuration: 60,
 };
@@ -22,7 +20,7 @@ function buildSystemPrompt() {
 - 시스템 설계를 먼저 생각하는 Design-First 사고 스타일
 
 ## 코칭 원칙
-1. **메타인지 촉진**: "왜 그 접근을 선택했어요?" — 사고 과정을 돌아보게 합니다
+1. **메타인지 촉진**: "왜 그 접근을 선택했어요?"
 2. **패턴 인식**: 반복되는 습관을 포착하여 짚어줍니다
 3. **구체적 행동 제안**: "다음에 이런 상황이 오면..." + 실제 예시
 4. **성장 마인드셋**: "아직 못하는 것"이 아니라 "아직 안 해본 것"
@@ -37,7 +35,7 @@ function buildSystemPrompt() {
 
 export default async function handler(req, res) {
   if (req.method === 'DELETE') {
-    const sid = req.url.split('/').pop();
+    const sid = req.query?.sessionId || 'default';
     delete conversationHistory[sid];
     return res.status(200).json({ ok: true });
   }
@@ -54,8 +52,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    const client = new Anthropic({ apiKey });
-
     if (!conversationHistory[sessionId]) {
       conversationHistory[sessionId] = [];
     }
@@ -67,23 +63,39 @@ export default async function handler(req, res) {
       conversationHistory[sessionId] = history.slice(-20);
     }
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 1500,
-      system: buildSystemPrompt(),
-      messages: conversationHistory[sessionId],
+    // fetch로 직접 Anthropic API 호출
+    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 1500,
+        system: buildSystemPrompt(),
+        messages: conversationHistory[sessionId],
+      }),
     });
 
-    const text = response.content
-      .filter((b) => b.type === 'text')
+    if (!apiRes.ok) {
+      const errData = await apiRes.text();
+      console.error('Anthropic API error:', apiRes.status, errData);
+      return res.status(500).json({ error: `API error: ${apiRes.status}` });
+    }
+
+    const data = await apiRes.json();
+    const text = data.content
+      ?.filter((b) => b.type === 'text')
       .map((b) => b.text)
-      .join('');
+      .join('') || '';
 
     history.push({ role: 'assistant', content: text });
 
     res.status(200).json({ text });
   } catch (err) {
-    console.error('Chat error:', err.message);
+    console.error('Chat error:', err);
     res.status(500).json({ error: err.message });
   }
 }
