@@ -1,7 +1,20 @@
 import express from 'express';
 import cors from 'cors';
-import { mkdirSync } from 'fs';
+import { mkdirSync, readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
+
+// .env 파일 로드
+const envPath = resolve(process.cwd(), '.env');
+if (existsSync(envPath)) {
+  const envContent = readFileSync(envPath, 'utf-8');
+  for (const line of envContent.split('\n')) {
+    const match = line.match(/^([^=]+)=(.+)$/);
+    if (match && !process.env[match[1].trim()]) {
+      process.env[match[1].trim()] = match[2].trim();
+    }
+  }
+  console.log('.env 로드 완료');
+}
 import checkpointRouter from './routes/checkpoint.js';
 import checkpointsRouter from './routes/checkpoints.js';
 import statusRouter from './routes/status.js';

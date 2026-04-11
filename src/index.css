@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-gray-50 text-gray-900 antialiased;
+    @apply bg-amber-50/30 text-gray-900 antialiased;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 }
@@ -20,6 +20,6 @@
     @apply flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-coach-50 hover:text-coach-700 transition-all;
   }
   .nav-link.active {
-    @apply bg-coach-50 text-coach-700 font-medium;
+    @apply bg-amber-50 text-amber-700 font-medium;
   }
 }

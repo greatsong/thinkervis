@@ -1,61 +1,58 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { readFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
 import { buildCoachingPrompt } from './prompts.js';
 import { generateLocalCoaching } from './local-analyzer.js';
 
-function getApiKey() {
-  // 1. 환경변수
-  if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
-
-  // 2. .env 파일
-  const envPath = resolve(process.cwd(), '.env');
-  if (existsSync(envPath)) {
-    const content = readFileSync(envPath, 'utf-8');
-    const match = content.match(/ANTHROPIC_API_KEY=(.+)/);
-    if (match) return match[1].trim();
-  }
-
-  return null;
-}
-
 export async function runCoaching(data, previousCoaching = null) {
-  const apiKey = getApiKey();
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
-    console.log('API 키 없음 — 로컬 분석 모드로 전환');
+    console.log('API 키 없음 — 로컬 분석 모드');
     return generateLocalCoaching(data, previousCoaching);
   }
 
   try {
-    const client = new Anthropic({ apiKey });
     const prompt = buildCoachingPrompt(data, previousCoaching);
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 8000,
-      messages: [{ role: 'user', content: prompt }],
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5-20250929',
+        max_tokens: 8000,
+        messages: [{ role: 'user', content: prompt }],
+      }),
+      signal: controller.signal,
     });
 
-    const text = response.content
-      .filter((b) => b.type === 'text')
-      .map((b) => b.text)
-      .join('');
+    clearTimeout(timeout);
 
-    const cleaned = text
-      .replace(/```json\s*/g, '')
-      .replace(/```\s*/g, '')
-      .trim();
+    if (!res.ok) {
+      console.error('Claude API 에러:', res.status);
+      return generateLocalCoaching(data, previousCoaching);
+    }
+
+    const result = await res.json();
+    const text = result.content
+      ?.filter((b) => b.type === 'text')
+      .map((b) => b.text)
+      .join('') || '';
+
+    const cleaned = text.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
 
     try {
       return JSON.parse(cleaned);
-    } catch (err) {
-      console.error('코칭 결과 파싱 실패:', err.message);
+    } catch {
+      console.error('코칭 결과 파싱 실패');
       return generateLocalCoaching(data, previousCoaching);
     }
   } catch (err) {
-    console.error('Claude API 호출 실패:', err.message);
-    console.log('로컬 분석 모드로 전환');
+    console.error('코칭 API 실패:', err.message);
     return generateLocalCoaching(data, previousCoaching);
   }
 }

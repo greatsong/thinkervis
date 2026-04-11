@@ -13,12 +13,16 @@ export default function HomePage() {
     setProgress('데이터 수집 중...');
     setTimeout(() => setProgress('세션 분석 중...'), 2000);
     setTimeout(() => setProgress('AI 코칭 분석 중...'), 5000);
-    setTimeout(() => setProgress('리포트 생성 중...'), 10000);
+    setTimeout(() => setProgress('서버 동기화 중...'), 10000);
 
     const result = await runCheckpoint();
     setProgress('');
     if (result?.checkpointId) {
       await refetch();
+      if (result.syncResult === 'uploaded') {
+        setProgress('서버 동기화 완료!');
+        setTimeout(() => setProgress(''), 2000);
+      }
       navigate(`/coaching/${result.checkpointId}`);
     }
   };

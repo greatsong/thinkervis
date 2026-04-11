@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { collectSessions } from '../collectors/session-collector.js';
 import { collectPrompts, analyzePromptQuality } from '../collectors/prompt-collector.js';
@@ -11,6 +11,17 @@ import { readJson } from '../utils/file-reader.js';
 
 const router = Router();
 const CHECKPOINTS_DIR = resolve(process.cwd(), 'checkpoints');
+
+function getSyncToken() {
+  if (process.env.SYNC_TOKEN) return process.env.SYNC_TOKEN;
+  const envPath = resolve(process.cwd(), '.env');
+  if (existsSync(envPath)) {
+    const content = readFileSync(envPath, 'utf-8');
+    const match = content.match(/SYNC_TOKEN=(.+)/);
+    if (match) return match[1].trim();
+  }
+  return null;
+}
 
 router.post('/', async (req, res) => {
   try {
@@ -117,12 +128,51 @@ router.post('/', async (req, res) => {
 
     console.log(`점검 완료: ${checkpointId}`);
 
+    // 6. 서버에 자동 업로드 (thinkervis.vercel.app)
+    let syncResult = null;
+    try {
+      const syncToken = getSyncToken();
+      if (syncToken) {
+        const uploadData = {
+          checkpointId,
+          timestamp: now.toISOString(),
+          period,
+          summary,
+          coaching,
+          recentPrompts: analyzedPrompts.slice(-15).map((p) => ({
+            text: p.text?.slice(0, 100),
+            timestamp: p.timestamp,
+            quality: p.quality,
+          })),
+        };
+
+        const syncRes = await fetch('https://thinkervis.vercel.app/api/sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-sync-token': syncToken,
+          },
+          body: JSON.stringify({ type: 'checkpoint', payload: uploadData }),
+        });
+        const syncData = await syncRes.json();
+        syncResult = syncData.ok ? 'uploaded' : 'failed';
+        console.log(`서버 동기화: ${syncResult}`);
+      } else {
+        syncResult = 'no-token';
+        console.log('SYNC_TOKEN 없음 — 서버 동기화 건너뜀');
+      }
+    } catch (syncErr) {
+      syncResult = 'error';
+      console.log('서버 동기화 실패:', syncErr.message);
+    }
+
     res.json({
       checkpointId,
       period,
       summary,
       coaching,
       previousChanges,
+      syncResult,
     });
   } catch (err) {
     console.error('점검 실행 오류:', err);
