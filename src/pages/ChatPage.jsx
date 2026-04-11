@@ -41,18 +41,14 @@ export default function ChatPage() {
     })();
   }, []);
 
-  // 세션 불러오기 (Gist에서 메시지 복원)
+  // 세션 불러오기
   const loadSession = async (sid) => {
     setCurrentSession(sid);
-    // GET에서 전체 세션 데이터를 가져옴
     try {
       const res = await fetch('/api/chat');
       const data = await res.json();
-      // full sessions는 GET에서 요약만 줌. 실제 메시지는 다시 빈 상태로 시작하되
-      // 기존 세션에 이어서 보내면 서버가 Gist에서 해당 세션 메시지를 로드함
       const session = (data.sessions || []).find((s) => s.id === sid);
       if (session) {
-        // 서버에서 메시지를 직접 가져오기 위해 빈 메시지로 시작
         setMessages([]);
         setCurrentSession(sid);
       }
@@ -159,7 +155,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col h-[100dvh] max-w-2xl mx-auto relative">
+    <div className="flex flex-col h-full max-w-2xl mx-auto relative">
       {/* 세션 사이드패널 */}
       {showSidebar && (
         <>
@@ -185,24 +181,10 @@ export default function ChatPage() {
               )}
             </div>
 
-            {/* 메인 메뉴 */}
-            <div className="px-4 pt-3 space-y-1">
-              <a href="/" className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
-                <span>🏠</span> 홈 (대시보드)
-              </a>
-              <a href="/history" className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
-                <span>📋</span> 점검 이력
-              </a>
-              <a href="/growth" className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
-                <span>📈</span> 성장 여정
-              </a>
-            </div>
-            <div className="mx-4 my-2 border-t border-gray-100" />
-
             {/* 새 대화 버튼 */}
             <button
               onClick={() => { endSession(); }}
-              className="mx-4 py-2 rounded-lg border border-purple-200 text-purple-600 text-sm font-medium hover:bg-purple-50"
+              className="mx-4 mt-3 py-2 rounded-lg border border-purple-200 text-purple-600 text-sm font-medium hover:bg-purple-50"
             >
               + 새 대화
             </button>
@@ -282,8 +264,8 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 입력 영역 - 모바일 대응 */}
-      <form onSubmit={handleSubmit} className="px-3 py-2 border-t border-gray-200 bg-white shrink-0 safe-bottom">
+      {/* 입력 영역 - 탭 바 위에 배치 */}
+      <form onSubmit={handleSubmit} className="px-3 py-2 border-t border-gray-200 bg-white shrink-0 mb-14 md:mb-0">
         <div className="flex gap-2 items-end">
           <input
             ref={inputRef}
