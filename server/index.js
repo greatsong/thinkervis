@@ -21,7 +21,7 @@ import statusRouter from './routes/status.js';
 import chatRouter from './routes/chat.js';
 
 const app = express();
-const PORT = 4024;
+const PORT = process.env.PORT || 4030;
 
 app.use(cors());
 app.use(express.json());

@@ -2,16 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "metacognition-server",
+      "name": "thinkervis-server",
       "runtimeExecutable": "node",
       "runtimeArgs": ["server/index.js"],
-      "port": 4024
+      "port": 4030
     },
     {
-      "name": "metacognition-vite",
+      "name": "thinkervis-vite",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["vite", "--port", "4023"],
-      "port": 4023
+      "runtimeArgs": ["vite", "--port", "4029"],
+      "port": 4029
     }
   ]
 }
