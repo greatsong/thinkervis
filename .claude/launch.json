@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "metacognition-vite",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["vite", "--port", "4023"],
+      "port": 4023
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+}
+
+@layer components {
+  .coaching-card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-6;
+  }
+  .score-badge {
+    @apply inline-flex items-center justify-center w-12 h-12 rounded-xl text-white font-bold text-lg;
+  }
+  .nav-link {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-coach-50 hover:text-coach-700 transition-all;
+  }
+  .nav-link.active {
+    @apply bg-coach-50 text-coach-700 font-medium;
+  }
+}

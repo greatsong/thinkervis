@@ -1,0 +1,13 @@
+{
+  "rewrites": [
+    { "source": "/api/chat", "destination": "/api/chat" },
+    { "source": "/api/status", "destination": "/api/status" },
+    { "source": "/api/checkpoints", "destination": "/api/checkpoints" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/chat.js": {
+      "maxDuration": 60
+    }
+  }
+}
