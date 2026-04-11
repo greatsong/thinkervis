@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "metacognition-server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server/index.js"],
+      "port": 4024
+    },
+    {
       "name": "metacognition-vite",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["vite", "--port", "4023"],

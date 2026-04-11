@@ -22,38 +22,38 @@ export default function ChatPage() {
       const res = await fetch('/api/chat');
       const data = await res.json();
       setSessions(data.sessions || []);
-      setCoachingInfo(data.coachingInfo);
       return data.sessions || [];
     } catch { return []; }
   }, []);
+
+  // 특정 세션의 메시지 로드
+  const loadSession = async (sid) => {
+    setCurrentSession(sid);
+    try {
+      const res = await fetch(`/api/chat?sessionId=${sid}`);
+      const data = await res.json();
+      if (data.messages && data.messages.length > 0) {
+        setMessages(data.messages.map(m => ({ role: m.role, content: m.content })));
+      } else {
+        setMessages([]);
+      }
+    } catch {
+      setMessages([]);
+    }
+  };
 
   // 초기 로드: 마지막 세션 이어가기 또는 새 세션
   useEffect(() => {
     (async () => {
       const list = await loadSessions();
-      const lastOpen = list.find((s) => !s.closed);
-      if (lastOpen) {
-        await loadSession(lastOpen.id);
+      if (list.length > 0) {
+        await loadSession(list[0].id);
       } else {
         startNewSession();
       }
       setInitialLoading(false);
     })();
   }, []);
-
-  // 세션 불러오기
-  const loadSession = async (sid) => {
-    setCurrentSession(sid);
-    try {
-      const res = await fetch('/api/chat');
-      const data = await res.json();
-      const session = (data.sessions || []).find((s) => s.id === sid);
-      if (session) {
-        setMessages([]);
-        setCurrentSession(sid);
-      }
-    } catch {}
-  };
 
   const startNewSession = () => {
     const sid = `s-${Date.now()}`;
@@ -134,7 +134,7 @@ export default function ChatPage() {
 
   const endSession = async () => {
     if (currentSession) {
-      await fetch(`/api/chat?sessionId=${currentSession}`, { method: 'DELETE' });
+      await fetch(`/api/chat/${currentSession}`, { method: 'DELETE' });
     }
     await loadSessions();
     startNewSession();
@@ -194,10 +194,8 @@ export default function ChatPage() {
               {sessions.map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => {
-                    setCurrentSession(s.id);
-                    setMessages([]);
-                    sendMessageDirect(s.id, '이전 대화 이어서 할게!');
+                  onClick={async () => {
+                    await loadSession(s.id);
                     setShowSidebar(false);
                   }}
                   className={`w-full text-left p-3 rounded-lg text-sm ${

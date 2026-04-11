@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import Anthropic from '@anthropic-ai/sdk';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
 import { readJson } from '../utils/file-reader.js';
 import { collectPrompts } from '../collectors/prompt-collector.js';
@@ -8,9 +8,37 @@ import { buildChatSystemPrompt } from '../coaching/chat-prompt.js';
 
 const router = Router();
 const CHECKPOINTS_DIR = resolve(process.cwd(), 'checkpoints');
+const CHAT_HISTORY_PATH = resolve(process.cwd(), 'data', 'chat-history.json');
 
-// 대화 히스토리 (메모리 내 저장, 서버 재시작 시 초기화)
-const conversationHistory = {};
+// 대화 히스토리 (파일에 영속 저장)
+let conversationHistory = {};
+
+// 파일에서 대화 기록 로드
+function loadHistory() {
+  try {
+    if (existsSync(CHAT_HISTORY_PATH)) {
+      const data = JSON.parse(readFileSync(CHAT_HISTORY_PATH, 'utf-8'));
+      conversationHistory = data.sessions || {};
+    }
+  } catch { conversationHistory = {}; }
+}
+
+// 파일에 대화 기록 저장
+function saveHistory() {
+  try {
+    const dir = resolve(process.cwd(), 'data');
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    writeFileSync(CHAT_HISTORY_PATH, JSON.stringify({
+      sessions: conversationHistory,
+      updatedAt: new Date().toISOString()
+    }, null, 2));
+  } catch (err) {
+    console.error('채팅 기록 저장 실패:', err.message);
+  }
+}
+
+// 서버 시작 시 기록 로드
+loadHistory();
 
 function getApiKey() {
   if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY;
@@ -38,6 +66,34 @@ function getUserData() {
   };
 }
 
+// 세션 목록 및 메시지 조회
+router.get('/', (req, res) => {
+  const sessionId = req.query.sessionId;
+
+  // 특정 세션의 메시지 조회
+  if (sessionId) {
+    const messages = conversationHistory[sessionId] || [];
+    return res.json({ messages });
+  }
+
+  // 전체 세션 목록 조회
+  const sessions = Object.entries(conversationHistory).map(([id, messages]) => {
+    const firstUser = messages.find(m => m.role === 'user');
+    const lastMsg = messages[messages.length - 1];
+    return {
+      id,
+      title: firstUser?.content?.slice(0, 30) || '대화',
+      messageCount: messages.length,
+      updatedAt: lastMsg?.timestamp || new Date().toISOString(),
+    };
+  });
+
+  // 최신순 정렬
+  sessions.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+
+  res.json({ sessions });
+});
+
 // SSE 스트리밍 채팅
 router.post('/', async (req, res) => {
   const { message, sessionId = 'default' } = req.body;
@@ -64,7 +120,7 @@ router.post('/', async (req, res) => {
     }
 
     const history = conversationHistory[sessionId];
-    history.push({ role: 'user', content: message });
+    history.push({ role: 'user', content: message, timestamp: new Date().toISOString() });
 
     // 최근 20개 메시지만 유지
     if (history.length > 20) {
@@ -92,7 +148,10 @@ router.post('/', async (req, res) => {
     }
 
     // 어시스턴트 응답을 히스토리에 추가
-    history.push({ role: 'assistant', content: fullResponse });
+    history.push({ role: 'assistant', content: fullResponse, timestamp: new Date().toISOString() });
+
+    // 파일에 저장
+    saveHistory();
 
     res.write(`data: [DONE]\n\n`);
     res.end();
@@ -107,6 +166,7 @@ router.post('/', async (req, res) => {
 // 대화 초기화
 router.delete('/:sessionId', (req, res) => {
   delete conversationHistory[req.params.sessionId];
+  saveHistory();
   res.json({ ok: true });
 });
 
