@@ -1,13 +1,14 @@
 {
   "rewrites": [
-    { "source": "/api/chat", "destination": "/api/chat" },
-    { "source": "/api/status", "destination": "/api/status" },
-    { "source": "/api/checkpoints", "destination": "/api/checkpoints" },
+    { "source": "/api/:path*", "destination": "/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "functions": {
     "api/chat.js": {
       "maxDuration": 60
+    },
+    "api/sync.js": {
+      "maxDuration": 30
     }
   }
 }
