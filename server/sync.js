@@ -8,7 +8,7 @@ import { resolve } from 'path';
 
 const CHECKPOINTS_DIR = resolve(process.cwd(), 'checkpoints');
 const CHAT_DIR = resolve(CHECKPOINTS_DIR, 'chat-history');
-const SERVER_URL = 'https://thinkervis.vercel.app';
+const SERVER_URL = 'https://metacognition-dashboard.vercel.app';
 
 function getEnv(key) {
   if (process.env[key]) return process.env[key];
