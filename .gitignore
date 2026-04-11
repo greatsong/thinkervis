@@ -2,6 +2,7 @@ node_modules/
 dist/
 .env
 checkpoints/
+!api/checkpoints/
 *.output
 .vercel
 .env*.local

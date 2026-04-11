@@ -185,10 +185,24 @@ export default function ChatPage() {
               )}
             </div>
 
+            {/* 메인 메뉴 */}
+            <div className="px-4 pt-3 space-y-1">
+              <a href="/" className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
+                <span>🏠</span> 홈 (대시보드)
+              </a>
+              <a href="/history" className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
+                <span>📋</span> 점검 이력
+              </a>
+              <a href="/growth" className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-700 hover:bg-gray-100">
+                <span>📈</span> 성장 여정
+              </a>
+            </div>
+            <div className="mx-4 my-2 border-t border-gray-100" />
+
             {/* 새 대화 버튼 */}
             <button
               onClick={() => { endSession(); }}
-              className="mx-4 mt-3 py-2 rounded-lg border border-purple-200 text-purple-600 text-sm font-medium hover:bg-purple-50"
+              className="mx-4 py-2 rounded-lg border border-purple-200 text-purple-600 text-sm font-medium hover:bg-purple-50"
             >
               + 새 대화
             </button>

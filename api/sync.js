@@ -48,6 +48,26 @@ export default async function handler(req, res) {
       if (type === 'checkpoint') {
         data.coaching = payload;
         data.lastSync = new Date().toISOString();
+        // 점검 이력 배열에도 추가
+        if (!data.checkpointHistory) data.checkpointHistory = [];
+        const exists = data.checkpointHistory.find(c => c.checkpointId === payload.checkpointId);
+        if (!exists) {
+          data.checkpointHistory.push({
+            id: payload.checkpointId,
+            timestamp: payload.timestamp,
+            period: payload.period,
+            summary: payload.summary,
+            scores: payload.coaching?.dimensions?.reduce((acc, d) => {
+              acc[d.name] = d.score;
+              return acc;
+            }, {}) || {},
+            overallNarrative: payload.coaching?.overallNarrative || '',
+          });
+          // 최근 50개만 유지
+          if (data.checkpointHistory.length > 50) {
+            data.checkpointHistory = data.checkpointHistory.slice(-50);
+          }
+        }
       } else if (type === 'chat') {
         if (!data.chatHistory) data.chatHistory = [];
         data.chatHistory.push({
