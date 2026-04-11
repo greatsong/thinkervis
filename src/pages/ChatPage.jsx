@@ -3,10 +3,10 @@ import { useState, useRef, useEffect } from 'react';
 export default function ChatPage() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [streaming, setStreaming] = useState(false);
+  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  const sessionId = useRef(`session-${Date.now()}`);
+  const sessionId = useRef(`s-${Date.now()}`);
   const initRef = useRef(false);
 
   useEffect(() => {
@@ -21,18 +21,21 @@ export default function ChatPage() {
   }, []);
 
   const sendMessage = async (text) => {
-    if (!text.trim() || streaming) return;
+    if (!text.trim() || loading) return;
 
     const userMsg = { role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
-    setStreaming(true);
+    setLoading(true);
 
-    const assistantMsg = { role: 'assistant', content: '' };
-    setMessages((prev) => [...prev, assistantMsg]);
+    // 로딩 표시
+    setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
     try {
-      const res = await fetch('/api/chat', {
+      const isLocal = window.location.hostname === 'localhost';
+      const url = isLocal ? '/api/chat' : '/api/chat';
+
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -41,47 +44,50 @@ export default function ChatPage() {
         }),
       });
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+      // SSE 스트리밍 (로컬) vs JSON (Vercel)
+      const contentType = res.headers.get('content-type') || '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      if (contentType.includes('text/event-stream')) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') continue;
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.type === 'text') {
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  const last = updated[updated.length - 1];
-                  if (last.role === 'assistant') {
-                    last.content += parsed.content;
-                  }
-                  return [...updated];
-                });
-              }
-              if (parsed.type === 'error') {
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  const last = updated[updated.length - 1];
-                  if (last.role === 'assistant') {
-                    last.content = '앗, 연결에 문제가 생겼어요! 다시 시도해볼까요? ✦';
-                  }
-                  return [...updated];
-                });
-              }
-            } catch {}
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6);
+              if (data === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.type === 'text') {
+                  setMessages((prev) => {
+                    const updated = [...prev];
+                    const last = updated[updated.length - 1];
+                    if (last.role === 'assistant') last.content += parsed.content;
+                    return [...updated];
+                  });
+                }
+              } catch {}
+            }
           }
         }
+      } else {
+        // JSON 응답 (Vercel serverless)
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last.role === 'assistant') last.content = data.text;
+          return [...updated];
+        });
       }
     } catch (err) {
       setMessages((prev) => {
@@ -94,7 +100,7 @@ export default function ChatPage() {
       });
     }
 
-    setStreaming(false);
+    setLoading(false);
     inputRef.current?.focus();
   };
 
@@ -111,12 +117,12 @@ export default function ChatPage() {
   };
 
   const resetChat = async () => {
-    await fetch(`/api/chat/${sessionId.current}`, { method: 'DELETE' });
-    sessionId.current = `session-${Date.now()}`;
+    try {
+      await fetch(`/api/chat?sessionId=${sessionId.current}`, { method: 'DELETE' });
+    } catch {}
+    sessionId.current = `s-${Date.now()}`;
     setMessages([]);
-    setTimeout(() => {
-      sendMessage('안녕 팅커비스! 새로운 대화 시작하자!');
-    }, 100);
+    setTimeout(() => sendMessage('안녕 팅커비스! 새로운 대화 시작하자!'), 100);
   };
 
   return (
@@ -124,7 +130,7 @@ export default function ChatPage() {
       {/* 헤더 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">✦</span>
+          <span className="text-xl text-purple-500 font-bold">✦</span>
           <div>
             <h1 className="text-base font-bold text-gray-900">팅커비스</h1>
             <p className="text-xs text-gray-400">문제해결 코치</p>
@@ -147,7 +153,7 @@ export default function ChatPage() {
           >
             {msg.role === 'assistant' && (
               <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center shrink-0 mt-1 mr-2">
-                <span className="text-sm">✦</span>
+                <span className="text-xs text-purple-600 font-bold">✦</span>
               </div>
             )}
             <div
@@ -185,13 +191,13 @@ export default function ChatPage() {
             rows={1}
             className="flex-1 resize-none rounded-xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:border-purple-400 focus:ring-1 focus:ring-purple-200"
             style={{ maxHeight: '120px' }}
-            disabled={streaming}
+            disabled={loading}
           />
           <button
             type="submit"
-            disabled={streaming || !input.trim()}
+            disabled={loading || !input.trim()}
             className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-              streaming || !input.trim()
+              loading || !input.trim()
                 ? 'bg-gray-100 text-gray-300'
                 : 'bg-purple-600 text-white hover:bg-purple-700 active:scale-95'
             }`}

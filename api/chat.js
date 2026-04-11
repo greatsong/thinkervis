@@ -53,11 +53,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'API 키 미설정' });
   }
 
-  // SSE 헤더
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
   try {
     const client = new Anthropic({ apiKey });
 
@@ -72,30 +67,23 @@ export default async function handler(req, res) {
       conversationHistory[sessionId] = history.slice(-20);
     }
 
-    const stream = await client.messages.stream({
+    const response = await client.messages.create({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 1500,
       system: buildSystemPrompt(),
       messages: conversationHistory[sessionId],
     });
 
-    let fullResponse = '';
+    const text = response.content
+      .filter((b) => b.type === 'text')
+      .map((b) => b.text)
+      .join('');
 
-    for await (const event of stream) {
-      if (event.type === 'content_block_delta' && event.delta?.text) {
-        const text = event.delta.text;
-        fullResponse += text;
-        res.write(`data: ${JSON.stringify({ type: 'text', content: text })}\n\n`);
-      }
-    }
+    history.push({ role: 'assistant', content: text });
 
-    history.push({ role: 'assistant', content: fullResponse });
-    res.write(`data: [DONE]\n\n`);
-    res.end();
+    res.status(200).json({ text });
   } catch (err) {
     console.error('Chat error:', err.message);
-    res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
-    res.write(`data: [DONE]\n\n`);
-    res.end();
+    res.status(500).json({ error: err.message });
   }
 }
