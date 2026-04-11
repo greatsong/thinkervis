@@ -11,11 +11,8 @@ async function getCoachingFromGist() {
     const gist = await res.json();
     const content = gist.files['tinkervis-data.json']?.content;
     if (!content) return null;
-    const data = JSON.parse(content);
-    return data.coaching;
-  } catch {
-    return null;
-  }
+    return JSON.parse(content).coaching;
+  } catch { return null; }
 }
 
 async function saveChatToGist(sessionId, messages) {
@@ -26,43 +23,31 @@ async function saveChatToGist(sessionId, messages) {
     const gist = await res.json();
     const content = gist.files['tinkervis-data.json']?.content;
     const data = content ? JSON.parse(content) : { coaching: null, chatHistory: [] };
-
     if (!data.chatHistory) data.chatHistory = [];
-
-    // 같은 세션이면 덮어쓰기, 아니면 추가
     const idx = data.chatHistory.findIndex((c) => c.sessionId === sessionId);
-    const chatEntry = { sessionId, messages, savedAt: new Date().toISOString() };
-    if (idx >= 0) data.chatHistory[idx] = chatEntry;
-    else data.chatHistory.push(chatEntry);
-
+    const entry = { sessionId, messages, savedAt: new Date().toISOString() };
+    if (idx >= 0) data.chatHistory[idx] = entry;
+    else data.chatHistory.push(entry);
     if (data.chatHistory.length > 10) data.chatHistory = data.chatHistory.slice(-10);
-
     await fetch(`https://api.github.com/gists/${process.env.GIST_ID}`, {
       method: 'PATCH',
-      headers: {
-        Authorization: `token ${process.env.GH_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        files: { 'tinkervis-data.json': { content: JSON.stringify(data, null, 2) } },
-      }),
+      headers: { Authorization: `token ${process.env.GH_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: { 'tinkervis-data.json': { content: JSON.stringify(data, null, 2) } } }),
     });
   } catch {}
 }
 
 function buildSystemPrompt(coaching) {
   const ctx = coaching
-    ? `
-## 최근 점검 결과 (${coaching.period?.from} ~ ${coaching.period?.to})
-- 세션 ${coaching.summary?.sessionsAnalyzed || 0}개, 프롬프트 ${coaching.summary?.promptsAnalyzed || 0}개 분석
+    ? `\n## 최근 점검 결과 (${coaching.period?.from} ~ ${coaching.period?.to})
+- 세션 ${coaching.summary?.sessionsAnalyzed || 0}개, 프롬프트 ${coaching.summary?.promptsAnalyzed || 0}개, 커밋 ${coaching.summary?.commitsAnalyzed || 0}개
 - 점수: ${coaching.coaching?.dimensions?.map((d) => `${d.name} ${d.score}/10`).join(', ') || '없음'}
 - 강점: ${coaching.coaching?.topStrengths?.join(', ') || '없음'}
 - 개선 영역: ${coaching.coaching?.focusAreas?.join(', ') || '없음'}
 - 목표: ${coaching.coaching?.nextGoals?.join(', ') || '없음'}
 - 핵심 메시지: ${coaching.coaching?.overallNarrative || '없음'}
 
-이 데이터를 바탕으로 구체적이고 사례 중심으로 코칭하세요. 이전 점검의 개선점이 나아졌는지 물어보세요.
-`
+이 데이터를 바탕으로 구체적이고 사례 중심으로 코칭하세요.\n`
     : '\n아직 점검 데이터가 없습니다. 자연스럽게 대화를 시작하세요.\n';
 
   return `당신은 "팅커비스" — 석리송의 문제해결 코치입니다.
@@ -84,15 +69,14 @@ ${ctx}
 
 ## 스타일
 - 3-5문장, 1-2개 포인트에 집중
-- 질문으로 대화를 이끌어감`;
+- 질문으로 대화를 이끌어감
+- 마크다운 문법(**, ## 등)을 절대 사용하지 마세요. 일반 텍스트로만 작성하세요.`;
 }
 
 export default async function handler(req, res) {
   if (req.method === 'DELETE') {
     const sid = req.query?.sessionId || 'default';
-    if (conversationHistory[sid]?.length > 0) {
-      await saveChatToGist(sid, conversationHistory[sid]);
-    }
+    if (conversationHistory[sid]?.length > 0) await saveChatToGist(sid, conversationHistory[sid]);
     delete conversationHistory[sid];
     return res.json({ ok: true });
   }
@@ -102,6 +86,11 @@ export default async function handler(req, res) {
   const { message, sessionId = 'default' } = req.body;
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return res.status(400).json({ error: 'API 키 미설정' });
+
+  // SSE 헤더
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
 
   try {
     if (!conversationHistory[sessionId]) conversationHistory[sessionId] = [];
@@ -121,6 +110,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 1500,
+        stream: true,
         system: buildSystemPrompt(coaching),
         messages: conversationHistory[sessionId],
       }),
@@ -128,18 +118,47 @@ export default async function handler(req, res) {
 
     if (!apiRes.ok) {
       const err = await apiRes.text();
-      return res.status(500).json({ error: `API ${apiRes.status}` });
+      res.write(`data: ${JSON.stringify({ type: 'error', content: `API ${apiRes.status}` })}\n\n`);
+      res.write(`data: [DONE]\n\n`);
+      return res.end();
     }
 
-    const data = await apiRes.json();
-    const text = data.content?.filter((b) => b.type === 'text').map((b) => b.text).join('') || '';
-    history.push({ role: 'assistant', content: text });
+    let fullResponse = '';
+    const reader = apiRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
 
-    // 5턴마다 자동 저장
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = line.slice(6).trim();
+        if (data === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+            const text = parsed.delta.text;
+            fullResponse += text;
+            res.write(`data: ${JSON.stringify({ type: 'text', content: text })}\n\n`);
+          }
+        } catch {}
+      }
+    }
+
+    history.push({ role: 'assistant', content: fullResponse });
     if (history.length % 10 === 0) await saveChatToGist(sessionId, history);
 
-    res.json({ text });
+    res.write(`data: [DONE]\n\n`);
+    res.end();
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.write(`data: ${JSON.stringify({ type: 'error', content: err.message })}\n\n`);
+    res.write(`data: [DONE]\n\n`);
+    res.end();
   }
 }

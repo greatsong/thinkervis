@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 export default function ChatPage() {
   const [messages, setMessages] = useState([]);
@@ -22,32 +23,22 @@ export default function ChatPage() {
 
   const sendMessage = async (text) => {
     if (!text.trim() || loading) return;
-
-    const userMsg = { role: 'user', content: text };
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => [...prev, { role: 'user', content: text }]);
     setInput('');
     setLoading(true);
-
-    // 로딩 표시
     setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
     try {
-      const isLocal = window.location.hostname === 'localhost';
-      const url = isLocal ? '/api/chat' : '/api/chat';
-
-      const res = await fetch(url, {
+      const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text,
-          sessionId: sessionId.current,
-        }),
+        body: JSON.stringify({ message: text, sessionId: sessionId.current }),
       });
 
-      // SSE 스트리밍 (로컬) vs JSON (Vercel)
       const contentType = res.headers.get('content-type') || '';
 
       if (contentType.includes('text/event-stream')) {
+        // SSE 스트리밍
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -55,31 +46,29 @@ export default function ChatPage() {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split('\n');
           buffer = lines.pop() || '';
 
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') continue;
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.type === 'text') {
-                  setMessages((prev) => {
-                    const updated = [...prev];
-                    const last = updated[updated.length - 1];
-                    if (last.role === 'assistant') last.content += parsed.content;
-                    return [...updated];
-                  });
-                }
-              } catch {}
-            }
+            if (!line.startsWith('data: ')) continue;
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.type === 'text') {
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last.role === 'assistant') last.content += parsed.content;
+                  return [...updated];
+                });
+              }
+            } catch {}
           }
         }
       } else {
-        // JSON 응답 (Vercel serverless)
+        // JSON fallback
         const data = await res.json();
         if (data.error) throw new Error(data.error);
         setMessages((prev) => {
@@ -89,40 +78,35 @@ export default function ChatPage() {
           return [...updated];
         });
       }
-    } catch (err) {
+    } catch {
       setMessages((prev) => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
-        if (last.role === 'assistant') {
-          last.content = '앗, 연결에 문제가 생겼어요! 다시 시도해볼까요? ✦';
-        }
+        if (last.role === 'assistant') last.content = '연결에 문제가 생겼어요. 다시 시도해주세요.';
         return [...updated];
       });
     }
-
     setLoading(false);
     inputRef.current?.focus();
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    sendMessage(input);
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage(input);
-    }
-  };
+  const handleSubmit = (e) => { e.preventDefault(); sendMessage(input); };
+  const handleKeyDown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); } };
 
   const resetChat = async () => {
-    try {
-      await fetch(`/api/chat?sessionId=${sessionId.current}`, { method: 'DELETE' });
-    } catch {}
+    try { await fetch(`/api/chat?sessionId=${sessionId.current}`, { method: 'DELETE' }); } catch {}
     sessionId.current = `s-${Date.now()}`;
     setMessages([]);
     setTimeout(() => sendMessage('안녕 팅커비스! 새로운 대화 시작하자!'), 100);
+  };
+
+  // ** 등 마크다운 기호를 일반 텍스트로 정리
+  const cleanMarkdown = (text) => {
+    return text
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/^#{1,3}\s/gm, '')
+      .replace(/^- /gm, '• ');
   };
 
   return (
@@ -136,34 +120,26 @@ export default function ChatPage() {
             <p className="text-xs text-gray-400">문제해결 코치</p>
           </div>
         </div>
-        <button
-          onClick={resetChat}
-          className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1"
-        >
-          새 대화
-        </button>
+        <button onClick={resetChat} className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1">새 대화</button>
       </div>
 
-      {/* 메시지 영역 */}
+      {/* 메시지 */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.slice(1).map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.role === 'assistant' && (
               <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center shrink-0 mt-1 mr-2">
                 <span className="text-xs text-purple-600 font-bold">✦</span>
               </div>
             )}
-            <div
-              className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
-                msg.role === 'user'
-                  ? 'bg-purple-600 text-white rounded-br-md'
-                  : 'bg-white border border-gray-100 text-gray-800 rounded-bl-md shadow-sm'
-              }`}
-            >
-              {msg.content || (
+            <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+              msg.role === 'user'
+                ? 'bg-purple-600 text-white rounded-br-md'
+                : 'bg-white border border-gray-100 text-gray-800 rounded-bl-md shadow-sm'
+            }`}>
+              {msg.content ? (
+                <span className="whitespace-pre-wrap">{cleanMarkdown(msg.content)}</span>
+              ) : (
                 <span className="inline-flex gap-1">
                   <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                   <span className="w-2 h-2 bg-purple-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -176,11 +152,8 @@ export default function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* 입력 영역 */}
-      <form
-        onSubmit={handleSubmit}
-        className="px-4 py-3 border-t border-gray-200 bg-white shrink-0"
-      >
+      {/* 입력 */}
+      <form onSubmit={handleSubmit} className="px-4 py-3 border-t border-gray-200 bg-white shrink-0">
         <div className="flex gap-2 items-end">
           <textarea
             ref={inputRef}
@@ -197,9 +170,7 @@ export default function ChatPage() {
             type="submit"
             disabled={loading || !input.trim()}
             className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
-              loading || !input.trim()
-                ? 'bg-gray-100 text-gray-300'
-                : 'bg-purple-600 text-white hover:bg-purple-700 active:scale-95'
+              loading || !input.trim() ? 'bg-gray-100 text-gray-300' : 'bg-purple-600 text-white hover:bg-purple-700 active:scale-95'
             }`}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
