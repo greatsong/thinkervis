@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>md-basic</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="rail" aria-label="학습 단계">
+        <div class="brand"><div class="brand-mark" aria-hidden="true">MD</div><div><p class="eyebrow">GitHub Project Journal</p><h1>md-basic</h1></div></div>
+        <nav class="step-list" aria-label="바로가기">
+          <a href="#guide" class="step is-active"><span>1</span>무엇을 쓰는지</a>
+          <a href="#builder" class="step"><span>2</span>일지 만들기</a>
+          <a href="#scaffold" class="step"><span>3</span>저장 구조</a>
+          <a href="#github" class="step"><span>4</span>GitHub에 올리기</a>
+        </nav>
+        <section class="quick-card"><p class="quick-title">오늘의 목표</p><p>Markdown 문법을 몰라도 <strong>프로젝트 일지 1개</strong>를 만들고 GitHub에 올릴 준비를 끝낸다.</p></section>
+      </aside>
+      <section class="workspace">
+        <section class="guide-band" id="guide">
+          <div class="guide-copy"><p class="eyebrow">처음 배우는 학생용</p><h2>일지는 보고서가 아니라, 오늘의 작업 증거입니다.</h2><p>좋은 프로젝트 일지는 완벽한 글보다 “무엇을 시도했고, 무엇이 막혔고, 다음에 무엇을 할지”가 분명한 글입니다. 아래 질문에 짧게 답하면 GitHub README나 `docs/journal/`에 붙여 넣을 수 있는 Markdown이 자동으로 만들어집니다.</p></div>
+          <div class="md-visual" aria-label="Markdown 예시 카드"><div class="dot-row"><span></span><span></span><span></span></div><pre># 2026-05-22 프로젝트 일지
+
+## 오늘 한 일
+- 센서 값을 읽었다.
+- 오류를 기록했다.
+
+## 다음 할 일
+- 그래프를 추가한다.</pre></div>
+        </section>
+        <section class="tool-grid" id="builder">
+          <form class="panel form-panel" id="journal-form">
+            <div class="panel-header"><p class="eyebrow">Journal Builder</p><h2>질문에 답하기</h2></div>
+            <label>프로젝트 이름<input name="projectName" value="나의 AI 프로젝트" /></label>
+            <label>오늘 날짜<input name="date" type="date" /></label>
+            <label>오늘의 목표<input name="goal" placeholder="예: 온도 센서 값을 읽고 화면에 보여주기" /></label>
+            <label>오늘 한 일<textarea name="done" placeholder="한 줄에 하나씩 적기&#10;예: Pico에 센서를 연결했다.&#10;예: Python 코드로 값을 출력했다."></textarea></label>
+            <label>막힌 점 / 오류<textarea name="blocked" placeholder="예: 포트가 인식되지 않았다.&#10;예: 라이브러리 이름을 잘못 설치했다."></textarea></label>
+            <label>배운 점<textarea name="learned" placeholder="예: 오류 메시지는 맨 마지막 줄부터 읽으면 원인을 찾기 쉽다."></textarea></label>
+            <label>다음 할 일<textarea name="next" placeholder="예: 값을 CSV로 저장한다.&#10;예: 그래프로 시각화한다."></textarea></label>
+          </form>
+          <section class="panel output-panel" aria-live="polite"><div class="panel-header row"><div><p class="eyebrow">Generated Markdown</p><h2>완성된 일지</h2></div><div class="button-row"><button type="button" id="copy-button">복사</button><button type="button" id="download-button">.md 저장</button></div></div><pre id="markdown-output" class="markdown-output"></pre></section>
+        </section>
+        <section class="info-grid" id="scaffold">
+          <article class="info-block"><p class="eyebrow">필수 폴더 구조</p><h2>처음 저장소는 이렇게 시작</h2><pre class="tree">my-project/
+├─ README.md
+├─ docs/
+│  └─ journal/
+│     ├─ 2026-05-22.md
+│     └─ 2026-05-29.md
+├─ src/
+└─ images/</pre><p>`README.md`에는 프로젝트 소개를 쓰고, 매일/매주 일지는 `docs/journal/날짜.md`에 모은다. 사진은 `images/`에 넣고 일지에서 연결한다.</p></article>
+          <article class="info-block"><p class="eyebrow">Markdown 최소 문법</p><h2>이 6개만 알면 충분</h2><ul class="syntax-list"><li><code># 제목</code><span>가장 큰 제목</span></li><li><code>## 소제목</code><span>내용 구역 나누기</span></li><li><code>- 항목</code><span>목록 만들기</span></li><li><code>**강조**</code><span>중요한 말 굵게</span></li><li><code>`코드`</code><span>명령어, 파일명 표시</span></li><li><code>![설명](이미지주소)</code><span>사진 넣기</span></li></ul></article>
+        </section>
+        <section class="github-band" id="github"><div><p class="eyebrow">GitHub 업로드 순서</p><h2>브라우저만으로 올리는 방법</h2></div><ol class="upload-steps"><li>GitHub 저장소에서 <strong>Add file</strong>을 누른다.</li><li><strong>Create new file</strong>을 고른다.</li><li>파일 이름에 <code>docs/journal/2026-05-22.md</code>처럼 입력한다.</li><li>위에서 만든 Markdown을 붙여 넣는다.</li><li>아래 초록색 <strong>Commit changes</strong> 버튼을 누른다.</li></ol></section>
+      </section>
+    </main>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./main.js"></script>
+  </body>
+</html>
