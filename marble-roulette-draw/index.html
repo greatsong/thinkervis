@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2026 하늘씨앗 남청장년 수련회 경품 추첨</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">🎁 Marble Roulette Race</p>
+          <h1>2026 하늘씨앗 남청장년 수련회 경품 추첨</h1>
+          <p>구슬들이 핀볼판을 통과해 내려오고, 결승선에 가장 먼저 도착한 구슬이 당첨됩니다.</p>
+        </div>
+        <div class="score">
+          <div><span>대기</span><strong id="ready-count">0</strong></div>
+          <div><span>당첨</span><strong id="picked-count">0</strong></div>
+          <div><span>전체</span><strong id="total-count">0</strong></div>
+        </div>
+      </section>
+
+      <section class="board-layout">
+        <section class="board-card">
+          <canvas id="board" width="1100" height="720"></canvas>
+          <div class="winner" id="winner">
+            <span>🏁 WINNER</span>
+            <strong id="winner-name">READY</strong>
+          </div>
+        </section>
+
+        <aside class="controls">
+          <button id="start" class="primary" type="button">🚀 구슬 출발</button>
+          <button id="shuffle" type="button">🔀 출발 순서 섞기</button>
+          <button id="undo" type="button">↩️ 방금 결과 되돌리기</button>
+          <button id="reset" type="button">🔄 전체 초기화</button>
+          <button id="share" type="button">🔗 공유 링크 복사</button>
+          <button id="export" type="button">💾 기록 파일 저장</button>
+          <button id="import" type="button">📂 기록 불러오기</button>
+          <input id="state-file" type="file" accept="application/json,.json" hidden />
+        </aside>
+      </section>
+
+      <section class="lists">
+        <article>
+          <div class="head">
+            <h2>🎟️ 대기 명단</h2>
+            <button id="save-ready" type="button">저장</button>
+          </div>
+          <textarea id="ready-editor"></textarea>
+        </article>
+        <article>
+          <div class="head">
+            <h2>🏆 당첨 기록</h2>
+            <button id="save-picked" type="button">저장</button>
+          </div>
+          <textarea id="picked-editor"></textarea>
+        </article>
+      </section>
+
+      <section class="history">
+        <h2>✨ 당첨 순서</h2>
+        <ol id="history"></ol>
+      </section>
+    </main>
+    <div class="toast" id="toast"></div>
+    <script src="./main.js"></script>
+  </body>
+</html>
